@@ -2,6 +2,7 @@ package com.example.Lab9.controller;
 
 import com.example.Lab9.entity.Area;
 import com.example.Lab9.entity.Usuario;
+import com.example.Lab9.repository.AreaRepository;
 import com.example.Lab9.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
@@ -19,6 +20,8 @@ import java.util.Optional;
 public class UsuarioWS {
   @Autowired
   UsuarioRepository usuarioRepository;
+  @Autowired
+  AreaRepository areaRepository;
   @GetMapping(value = "/usuario", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity listarUsuarios(){
     return new ResponseEntity(usuarioRepository.findAll(), HttpStatus.OK);
@@ -27,12 +30,26 @@ public class UsuarioWS {
   @PostMapping(value = "/usuario", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity guardarUsuario(@RequestBody Usuario usuario, @RequestParam(value = "fetchCorreo", required = false) boolean fetchCorreo){
     HashMap<String, Object> responseMap = new HashMap<>();
-    usuarioRepository.save(usuario);
-    if(fetchCorreo){
-      responseMap.put("correo", usuario.getCorreo());
+    if (usuario.getCorreo()!=null) {
+      if(areaRepository.existsById(usuario.getIdarea())) {
+        usuarioRepository.save(usuario);
+        if (fetchCorreo) {
+          responseMap.put("correo", usuario.getCorreo());
+        }
+        responseMap.put("estado", "creado");
+        return new ResponseEntity(responseMap, HttpStatus.CREATED);
+      }
+      else{
+        responseMap.put("estado", "error");
+        responseMap.put("msg", "No existe area con ese id");
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+      }
     }
-    responseMap.put("estado", "creado");
-    return new ResponseEntity(responseMap, HttpStatus.CREATED);
+    else{
+      responseMap.put("estado", "error");
+      responseMap.put("msg", "Debe enviar un Usuario ");
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @PutMapping(value = "/usuario", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -41,18 +58,32 @@ public class UsuarioWS {
     if (usuario.getCorreo() != null) {
       Optional<Usuario> optionalUsuario = usuarioRepository.findById(usuario.getCorreo());
       if (optionalUsuario.isPresent()) {
-        usuarioRepository.save(usuario);
-        responseMap.put("estado", "actualizado");
-        return new ResponseEntity(responseMap, HttpStatus.OK);
+        if(areaRepository.existsById(usuario.getIdarea())) {
+          optionalUsuario.get().setIdarea(usuario.getIdarea());
+          if(usuario.getNombres()!=null){
+            optionalUsuario.get().setNombres(usuario.getNombres());
+          }
+          if(usuario.getApellidos()!=null){
+            optionalUsuario.get().setApellidos(usuario.getApellidos());
+          }
+          usuarioRepository.save(optionalUsuario.get());
+          responseMap.put("estado", "actualizado");
+          return new ResponseEntity(responseMap, HttpStatus.OK);
+        }
+        else{
+          responseMap.put("estado", "error");
+          responseMap.put("msg", "Debe enviar un id area válido");
+          return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+        }
       } else {
         responseMap.put("estado", "error");
         responseMap.put("msg", "El correo del usuario a actualizar no existe");
-        return new ResponseEntity(responseMap, HttpStatus.OK);
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
       }
     } else {
       responseMap.put("estado", "error");
       responseMap.put("msg", "Debe enviar un correo");
-      return new ResponseEntity(responseMap, HttpStatus.OK);
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
     }
   }
 

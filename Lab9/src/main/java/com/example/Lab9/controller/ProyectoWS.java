@@ -1,8 +1,13 @@
 package com.example.Lab9.controller;
 
+import com.example.Lab9.dto.ActividadesDto;
+import com.example.Lab9.dto.AreaDto;
 import com.example.Lab9.entity.Area;
 import com.example.Lab9.entity.Proyecto;
+import com.example.Lab9.repository.ActividadRepository;
+import com.example.Lab9.repository.AreaRepository;
 import com.example.Lab9.repository.ProyectoRepository;
+import com.example.Lab9.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,6 +24,10 @@ import java.util.Optional;
 public class ProyectoWS {
   @Autowired
   ProyectoRepository proyectoRepository;
+  @Autowired
+  ActividadRepository actividadRepository;
+  @Autowired
+  UsuarioRepository usuarioRepository;
   @GetMapping(value = "/proyecto", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity listarProyectos(){
     return new ResponseEntity(proyectoRepository.findAll(), HttpStatus.OK);
@@ -49,12 +58,46 @@ public class ProyectoWS {
   @PostMapping(value = "/proyecto", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity guardarProyecto(@RequestBody Proyecto proyecto, @RequestParam(value = "fetchId", required = false) boolean fetchId){
     HashMap<String, Object> responseMap = new HashMap<>();
-    proyectoRepository.save(proyecto);
-    if(fetchId){
-      responseMap.put("id", proyecto.getIdproyecto());
+    if(proyecto.getUsuario_owner()!=null) {
+      proyectoRepository.save(proyecto);
+      if (fetchId) {
+        responseMap.put("id", proyecto.getIdproyecto());
+      }
+      responseMap.put("estado", "creado");
+      return new ResponseEntity(responseMap, HttpStatus.CREATED);
     }
-    responseMap.put("estado", "creado");
-    return new ResponseEntity(responseMap, HttpStatus.CREATED);
+    else{
+      responseMap.put("estado", "error");
+      responseMap.put("msg", "El proyecto debe tener un usuario a cargo");
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+    }
+  }
+
+  @GetMapping(value = "/proyectoConActividades/{id}")
+  public ResponseEntity proyectoConActividades(@PathVariable("id") String idProyecto){
+    HashMap<String, Object> responseMap = new HashMap<>();
+    try {
+      int id = Integer.parseInt(idProyecto);
+      Optional<Proyecto> optionalProyecto = proyectoRepository.findById(id);
+      if (optionalProyecto.isPresent()) {
+        ActividadesDto actividadesProyecto = new ActividadesDto();
+        actividadesProyecto.setIdproyecto(optionalProyecto.get().getIdproyecto());
+        actividadesProyecto.setNombreproyecto(optionalProyecto.get().getNombreProyecto());
+        actividadesProyecto.setUsuario_owner(optionalProyecto.get().getUsuario_owner());
+        actividadesProyecto.setListaActividades(actividadRepository.actividadesProyecto(id));
+        responseMap.put("estado", "ok");
+        responseMap.put("proyecto", actividadesProyecto);
+        return new ResponseEntity(responseMap, HttpStatus.OK);
+      } else {
+        responseMap.put("estado", "error");
+        responseMap.put("msg", "no se encontró el area con id: " + id);
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+      }
+    } catch (NumberFormatException e) {
+      responseMap.put("estado", "error");
+      responseMap.put("msg", "El ID debe ser un número");
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+    }
   }
 
   @PutMapping(value = "/proyecto", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -63,18 +106,37 @@ public class ProyectoWS {
     if (proyecto.getIdproyecto() > 0) {
       Optional<Proyecto> optionalProyecto = proyectoRepository.findById(proyecto.getIdproyecto());
       if (optionalProyecto.isPresent()) {
-        proyectoRepository.save(proyecto);
-        responseMap.put("estado", "actualizado");
-        return new ResponseEntity(responseMap, HttpStatus.OK);
+        if (proyecto.getUsuario_owner() != null) {
+          if (usuarioRepository.existsById(proyecto.getUsuario_owner())) {
+            if (proyecto.getNombreProyecto() != null) {
+              optionalProyecto.get().setNombreProyecto(proyecto.getNombreProyecto());
+            }
+            optionalProyecto.get().setUsuario_owner(proyecto.getUsuario_owner());
+            proyectoRepository.save(optionalProyecto.get());
+            responseMap.put("estado", "actualizado");
+            return new ResponseEntity(responseMap, HttpStatus.OK);
+          } else {
+            responseMap.put("estado", "error");
+            responseMap.put("msg", "Debe enviar un usuario existente");
+            return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+          }
+        }
+        else{
+          if (proyecto.getNombreProyecto() != null) {
+            optionalProyecto.get().setNombreProyecto(proyecto.getNombreProyecto());
+          }
+          responseMap.put("estado", "No hay nada para actualizar");
+          return new ResponseEntity(responseMap, HttpStatus.OK);
+        }
       } else {
         responseMap.put("estado", "error");
         responseMap.put("msg", "El id del proyecto a actualizar no existe");
-        return new ResponseEntity(responseMap, HttpStatus.OK);
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
       }
     } else {
       responseMap.put("estado", "error");
       responseMap.put("msg", "Debe enviar un ID");
-      return new ResponseEntity(responseMap, HttpStatus.OK);
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
     }
   }
 

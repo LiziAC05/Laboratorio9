@@ -3,6 +3,8 @@ package com.example.Lab9.controller;
 import com.example.Lab9.entity.Actividad;
 import com.example.Lab9.entity.Area;
 import com.example.Lab9.repository.ActividadRepository;
+import com.example.Lab9.repository.ProyectoRepository;
+import com.example.Lab9.repository.UsuarioRepository;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.http.HttpStatus;
 import org.springframework.http.MediaType;
@@ -19,20 +21,59 @@ import java.util.Optional;
 public class ActividadWS {
   @Autowired
   ActividadRepository actividadRepository;
+  @Autowired
+  ProyectoRepository proyectoRepository;
+  @Autowired
+  UsuarioRepository usuarioRepository;
   @GetMapping(value = "/actividad", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity listarActividades() {
     return new ResponseEntity(actividadRepository.findAll(), HttpStatus.OK);
   }
 
+  @GetMapping(value = "/actividad/{id}", produces = MediaType.APPLICATION_JSON_VALUE)
+  public ResponseEntity obtenerArea(@PathVariable("id") String idActividad) {
+    HashMap<String, Object> responseMap = new HashMap<>();
+    try {
+      int id = Integer.parseInt(idActividad);
+      Optional<Actividad> optionalActividad = actividadRepository.findById(id);
+      if (optionalActividad.isPresent()) {
+        responseMap.put("estado", "ok");
+        responseMap.put("actividad", optionalActividad.get());
+        return new ResponseEntity(responseMap, HttpStatus.OK);
+      } else {
+        responseMap.put("estado", "error");
+        responseMap.put("msg", "no se encontró la actividad con id: " + id);
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+      }
+    } catch (NumberFormatException e) {
+      responseMap.put("estado", "error");
+      responseMap.put("msg", "El ID debe ser un número");
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+    }
+  }
+
   @PostMapping(value = "/actividad", produces = MediaType.APPLICATION_JSON_VALUE)
   public ResponseEntity guardarActividades(@RequestBody Actividad actividad, @RequestParam(value = "fetchId", required = false) boolean fetchId) {
     HashMap<String, Object> responseMap = new HashMap<>();
-    actividadRepository.save(actividad);
-    if (fetchId) {
-      responseMap.put("id", actividad.getIdactividad());
+
+    if(proyectoRepository.existsById(actividad.getIdproyecto())) {
+      if(usuarioRepository.existsById(actividad.getUsuario_owner())){
+        actividadRepository.save(actividad);
+        if (fetchId) {
+          responseMap.put("id", actividad.getIdactividad());
+        }
+        responseMap.put("estado", "creado");
+        return new ResponseEntity(responseMap, HttpStatus.CREATED);
+      }else{
+        responseMap.put("estado", "error");
+        responseMap.put("msg", "no se encontró el usuario asociado: " + actividad.getUsuario_owner());
+        return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
+      }
+    }else{
+      responseMap.put("estado", "error");
+      responseMap.put("msg", "no se encontró el proyecto con id: " + actividad.getIdproyecto());
+      return new ResponseEntity(responseMap, HttpStatus.BAD_REQUEST);
     }
-    responseMap.put("estado", "creado");
-    return new ResponseEntity(responseMap, HttpStatus.CREATED);
   }
 
   @PutMapping(value = "/actividad", produces = MediaType.APPLICATION_JSON_VALUE)

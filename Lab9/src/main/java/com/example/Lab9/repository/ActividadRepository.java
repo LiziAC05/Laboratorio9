@@ -12,4 +12,7 @@ public interface ActividadRepository extends JpaRepository<Actividad, Integer> {
     @Query(value = "select distinct a.*from actividades a inner join proyectos p join actividades a2 on p.idproyecto = a2.idproyecto\n" +
             "where p.idproyecto=?1",nativeQuery = true)
     List<Actividad> actividadesProyecto(int id);
+    @Query(value="select idactividad from actividades\n" +
+            "where idproyecto=?1",nativeQuery = true)
+    List<Integer> idActividadProyecto(int id);
 }

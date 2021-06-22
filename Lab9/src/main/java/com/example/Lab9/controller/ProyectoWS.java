@@ -17,6 +17,7 @@ import org.springframework.web.bind.annotation.*;
 
 import javax.servlet.http.HttpServletRequest;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Optional;
 
 @RestController
@@ -146,6 +147,10 @@ public class ProyectoWS {
     try {
       int id = Integer.parseInt(idproyecto);
       if (proyectoRepository.existsById(id)) {
+        List<Integer> list = actividadRepository.idActividadProyecto(id);
+        for(int i=0;i<list.size();i++){
+          actividadRepository.deleteById(list.get(i));
+        }
         proyectoRepository.deleteById(id);
         responseMap.put("estado", "borrado exitoso");
         return new ResponseEntity(responseMap, HttpStatus.OK);
